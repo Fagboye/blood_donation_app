@@ -1,76 +1,32 @@
 from flask import Flask, jsonify, request
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy_utils import ChoiceType
 from datetime import datetime
 import bcrypt
 import jwt
 from sqlalchemy import desc
-from dotenv import load_dotenv
-import os
-
-app = Flask(__name__)
-
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite3'
-db = SQLAlchemy(app)
+from models import db, User, DonationLog, Schedulelog
+from Authorization import generate_token, get_user_id_from_token
 
 
+def create_app():
+  app = Flask(__name__)
+  app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///db.sqlite3'
+  db.init_app(app)
 
-# DEFINING THE TABLES IN THE DATABASE
+  return app
 
-# the user model 
-class User(db.Model):
-  Gender_choices = [
-      ('male', "Male"),
-      ('female', "Female"),
-  ]
-  BLOOD_GROUP_CHOICES = [
-       ('A+', 'A+'),
-       ('A-', 'A-'),
-       ('B+', 'B+'),
-       ('B-', 'B-'),
-       ('AB+', 'AB+'),
-       ('AB-', 'AB-'),
-       ('O+', 'O+'),
-       ('O-', 'O-')
-   ]
-  id = db.Column(db.Integer, primary_key=True)
-  username = db.Column(db.String(80), unique=True, nullable=False)
-  password = db.Column(db.String(200), nullable=False)
-  first_name = db.Column(db.String(80), nullable=False)
-  last_name = db.Column(db.String(80), nullable=False)
-  gender = db.Column(ChoiceType(Gender_choices), nullable=False)
-  blood_group = db.Column(ChoiceType(BLOOD_GROUP_CHOICES), nullable=False)
 
-# the donation log model 
-class DonationLog(db.Model):
-  id = db.Column(db.Integer, primary_key=True)
-  user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-  date = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+app = create_app()
 
-# the schedule table 
-class Schedulelog(db.Model):
-   id = db.Column(db.Integer, primary_key=True)
-   user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
-   schedule_date = db.Column(db.DateTime, nullable=False)
+
+
+
 
 with app.app_context():
   db.create_all()
 
-# import the secret token from the .env file 
-load_dotenv()
 
 
-# define the generate_token function 
-def generate_token(user_id):
-  #define the payload for the token 
-  payload = {'user_id': user_id}
-
-  # generate the token 
-  token = jwt.encode(payload, os.getenv("SECRET_TOKEN"), algorithm='HS256')
-
-  #return the token as a string
-  return token
-
+# CREATING THE DIFFERENT APPLICATION ROUTES
 
 @app.route('/')
 def index():
@@ -114,16 +70,6 @@ def register():
         'blood_group': blood_group
     })
 
-# FUNCTION TO CHECK THE AUTHORIZATION OF THE USER WHEN INTERACTING WITH THE DATABASE
-def get_user_id_from_token(token):
-       try:
-           payload = jwt.decode(token, app.config['SECRET_KEY'], algorithms=['HS256'])
-           user_id = payload['user_id']
-           return user_id
-       except jwt.ExpiredSignatureError:
-           return None
-       except jwt.InvalidTokenError:
-           return None
 
 
 # LOGIN ROUTE AND FUNCTION
@@ -187,7 +133,7 @@ def schedule_appointment():
     
     #make a new instance of a schedule in the schedule table of the database 
     schedule_date = request.form.get('schedule_date')
-    new_schedule = Schedulelog(user_id=user_id, schedule_date=schedule_date)
+    new_schedule = Schedulelog(user_id=user_id, schedule_date=datetime(schedule_date))
     return jsonify({'message': 'schedule successfully made'})
    if request.method == "GET":
         pass
